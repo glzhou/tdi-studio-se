@@ -192,14 +192,14 @@ public class BuildJobHandler extends AbstractBuildJobHandler {
         itemsFolder.create(true, true, monitor);
         List<Item> items = new ArrayList<Item>();
         items.add(processItem);
-        if (isOptionChoosed(ExportChoice.needJobItem)) {
-            ExportItemUtil exportItemUtil = new ExportItemUtil();
-            if (withDependencies) {
-                Collection<IRepositoryViewObject> allProcessDependencies = ProcessUtils.getAllProcessDependencies(items);
-                for (IRepositoryViewObject repositoryObject : allProcessDependencies) {
-                    items.add(repositoryObject.getProperty().getItem());
-                }
+        ExportItemUtil exportItemUtil = new ExportItemUtil();
+        if (withDependencies) {
+            Collection<IRepositoryViewObject> allProcessDependencies = ProcessUtils.getAllProcessDependencies(items);
+            for (IRepositoryViewObject repositoryObject : allProcessDependencies) {
+                items.add(repositoryObject.getProperty().getItem());
             }
+        }
+        if (isOptionChoosed(ExportChoice.needJobItem)) {
             File destination = new File(itemsFolder.getLocation().toFile().getAbsolutePath());
             exportItemUtil.setProjectNameAsLowerCase(isProjectNameLowerCase());
             exportItemUtil.exportItems(destination, new ArrayList<Item>(items), false, new NullProgressMonitor());
