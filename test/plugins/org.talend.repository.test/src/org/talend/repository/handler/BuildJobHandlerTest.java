@@ -1,14 +1,21 @@
 package org.talend.repository.handler;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertTrue;
 
 import java.io.File;
+import java.net.URL;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
+import org.eclipse.core.runtime.FileLocator;
 import org.eclipse.core.runtime.NullProgressMonitor;
-import org.junit.Assert;
+import org.eclipse.core.runtime.Path;
+import org.eclipse.core.runtime.Platform;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 import org.talend.core.model.properties.Item;
 import org.talend.core.model.properties.ProcessItem;
@@ -19,28 +26,42 @@ import org.talend.repository.items.importexport.handlers.model.ImportItem;
 import org.talend.repository.items.importexport.manager.ResourcesManager;
 import org.talend.repository.items.importexport.ui.managers.FileResourcesUnityManager;
 import org.talend.repository.items.importexport.ui.managers.ResourcesManagerFactory;
-import org.talend.repository.ui.wizards.exportjob.handler.BuildJobHandler;
+import org.talend.repository.ui.wizards.exportjob.JavaJobScriptsExportWSWizardPage.JobExportType;
+import org.talend.repository.ui.wizards.exportjob.scriptsmanager.BuildJobManager;
 import org.talend.repository.ui.wizards.exportjob.scriptsmanager.JobScriptsManager.ExportChoice;
+import org.talend.repository.ui.wizards.exportjob.util.ExportJobUtil;
 
 public class BuildJobHandlerTest {
 
-    @Test
-    public void testBuildJobDenpendenciesCheck() throws Exception {
-        ProcessItem processItem = null;
+    private ProcessItem processItem;
+
+    private String destinationPath;
+
+    @Before
+    public void setUp() throws Exception {
         ImportExportHandlersManager importManager = new ImportExportHandlersManager();
-        // job with tHmap.
-        File srcFile = new File("resources/testTDMJob.zip");
+        // job with tdm and tdq component.
+        URL testJobURL = FileLocator.find(Platform.getBundle("org.talend.repository.test"), new Path(
+                "/resources/testBuildJob.zip"), null);
+        if (testJobURL != null) {
+            testJobURL = FileLocator.toFileURL(testJobURL);
+        }
+        File srcFile = new File(testJobURL.getFile());
         FileResourcesUnityManager fileUnityManager = ResourcesManagerFactory.getInstance().createFileUnityManager(srcFile);
         ResourcesManager resManager = fileUnityManager.doUnify();
         List<ImportItem> projectRecords = importManager.populateImportingItems(resManager, true, new NullProgressMonitor());
-        Assert.assertTrue(projectRecords.size() > 0);
+        assertTrue(projectRecords.size() > 0);
         importManager.importItemRecords(new NullProgressMonitor(), resManager, projectRecords, true,
                 projectRecords.toArray(new ImportItem[0]), null);
 
-        IRepositoryViewObject obj = ProxyRepositoryFactory.getInstance().getLastVersion("_EtK5gPAJEeWJrK20z22A8Q");
+        IRepositoryViewObject obj = ProxyRepositoryFactory.getInstance().getLastVersion("_bWyBUAYbEeapTZ0aKwL_YA");
         Item item = obj.getProperty().getItem();
         assertTrue(item instanceof ProcessItem);
         processItem = (ProcessItem) item;
+    }
+
+    @Test
+    public void testBuildJobDenpendenciesCheck() throws Exception {
         Map<ExportChoice, Object> exportChoiceMap = new HashMap<ExportChoice, Object>();
         exportChoiceMap.put(ExportChoice.needLauncher, true);
         exportChoiceMap.put(ExportChoice.needSystemRoutine, true);
@@ -60,10 +81,25 @@ public class BuildJobHandlerTest {
         exportChoiceMap.put(ExportChoice.log4jLevel, null);
         exportChoiceMap.put(ExportChoice.needDependencies, true);
         exportChoiceMap.put(ExportChoice.needParameterValues, false);
-        BuildJobHandler handler = new BuildJobHandler(processItem, "0.1", "Default", exportChoiceMap);
-        handler.generateItemFiles(true, new NullProgressMonitor());
-        boolean hasItemDependencies = handler.hasItemDependencies();
-        assertFalse(hasItemDependencies);
+
+        destinationPath = ExportJobUtil.getTmpFolderPath() + "/testBuildJob.zip";
+        BuildJobManager.getInstance().buildJob(destinationPath, processItem, "0.1", "Default", exportChoiceMap,
+                JobExportType.POJO, new NullProgressMonitor());
+        assertTrue(new File(destinationPath).exists());
+        ZipFile zip = new ZipFile(destinationPath);
+        ZipEntry tdm = zip.getEntry("testBuildJob/__tdm/");
+        ZipEntry tdq = zip.getEntry("testBuildJob/items/reports/");
+        assertTrue(tdm != null && tdm.isDirectory());
+        assertTrue(tdq != null && tdq.isDirectory());
+        zip.close();
     }
 
+    @After
+    public void tearDown() throws Exception {
+        ExportJobUtil.deleteTempFiles();
+        File file = new File(destinationPath);
+        if (file.exists()) {
+            file.delete();
+        }
+    }
 }
